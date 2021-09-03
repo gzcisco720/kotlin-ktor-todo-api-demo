@@ -3,28 +3,50 @@ package com.todo.ktor.repositories
 import com.todo.ktor.common.DatabaseManager
 import com.todo.ktor.entities.TodoEntity
 import com.todo.ktor.entities.todo
-import com.todo.ktor.vo.Todo
 import com.todo.ktor.vo.TodoDraft
+import org.ktorm.dsl.eq
 import org.ktorm.entity.add
+import org.ktorm.entity.find
+import org.ktorm.entity.removeIf
 import org.ktorm.entity.toList
 
 class TodoRepository: ITodoRepository {
 
-    override suspend fun getTodos(): List<Todo> {
+    override suspend fun getTodos(): List<TodoEntity> {
         return DatabaseManager.dbQuery {
             todo.toList()
-        }.map { Todo(it.id, it.title, it.done) }
+        }
     }
 
-    override suspend fun addTodo(draft: TodoDraft): Todo {
-        val savedId = DatabaseManager.dbQuery {
+    override suspend fun getTodo(id: Long): TodoEntity? {
+        return DatabaseManager.dbQuery {
+            todo.find { it.id eq id }
+        }
+    }
+
+    override suspend fun addTodo(draft: TodoDraft): Boolean {
+        return DatabaseManager.dbQuery {
             val entity = TodoEntity {
                 title = draft.title
                 done = draft.done
             }
-            todo.add(entity)
+            todo.add(entity) >0
         }
-        return Todo(savedId.toLong(), draft.title, draft.done)
+    }
+
+    override suspend fun updateTodo(id: Long, draft: TodoDraft): Boolean {
+        return DatabaseManager.dbQuery {
+            val found = todo.find { it.id eq id } ?: return@dbQuery false
+            found.title = draft.title
+            found.done = draft.done
+            return@dbQuery found.flushChanges() > 0
+        }
+    }
+
+    override suspend fun removeTodo(id: Long): Boolean {
+        return DatabaseManager.dbQuery {
+            todo.removeIf { it.id eq id } > 0
+        }
     }
 
 }
